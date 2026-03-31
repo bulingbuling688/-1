@@ -26,6 +26,20 @@
     },
     {
       "type": "rss",
+      "enabled": true,
+      "name": "openai_news",
+      "url": "https://openai.com/news/rss.xml",
+      "limit": 20
+    },
+    {
+      "type": "anthropic_news",
+      "enabled": true,
+      "name": "anthropic_news",
+      "url": "https://www.anthropic.com/news",
+      "limit": 20
+    },
+    {
+      "type": "rss",
       "enabled": false,
       "name": "bbc_world",
       "url": "https://feeds.bbci.co.uk/news/world/rss.xml",

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from news_pipeline.collectors import collect_hn_topstories, collect_raingou, collect_rss
+from news_pipeline.collectors import collect_anthropic_news, collect_hn_topstories, collect_raingou, collect_rss
 
 
 def collect_all(config: Dict[str, Any], timeout_sec: int) -> List[Dict[str, Any]]:
@@ -14,6 +14,8 @@ def collect_all(config: Dict[str, Any], timeout_sec: int) -> List[Dict[str, Any]
                 items = collect_hn_topstories(source, timeout_sec)
             elif stype == "rss":
                 items = collect_rss(source, timeout_sec)
+            elif stype == "anthropic_news":
+                items = collect_anthropic_news(source, timeout_sec)
             elif stype == "raingou":
                 items = collect_raingou(source, timeout_sec)
             else:
@@ -24,4 +26,3 @@ def collect_all(config: Dict[str, Any], timeout_sec: int) -> List[Dict[str, Any]
         except Exception as ex:
             print(f"[ERROR] source={source.get('name', stype)} failed: {ex}")
     return all_items
-

@@ -14,7 +14,7 @@
 
 ### 核心功能
 
-- 多源新闻采集：支持 Hacker News、RSS、Raingou 等来源，统一输出为同一数据结构，便于后续处理。
+- 多源新闻采集：支持 Hacker News、OpenAI RSS、Anthropic News、通用 RSS、Raingou 等来源，统一输出为同一数据结构，便于后续处理。
 - 本地去重与状态持久化：使用 SQLite 记录 `seen_items` 和 `outbox`，避免重复入队和重复发送。
 - 批量投递到 Webhook：按批次把数据推送到 n8n，便于接入自动化工作流。
 - 失败重试与退避：投递失败后自动重试，并支持指数退避，降低临时网络问题带来的丢单风险。
@@ -116,6 +116,7 @@ python collector.py --config config.json --retry-failed --deliver-only
 │  ├─ source_registry.py              # 采集源注册与调度
 │  ├─ collectors/
 │  │  ├─ hn.py                        # Hacker News 采集器
+│  │  ├─ anthropic_news.py            # Anthropic News 页面采集器
 │  │  ├─ rss.py                       # RSS 采集器
 │  │  └─ raingou.py                   # Raingou 采集器
 │  ├─ processors/
