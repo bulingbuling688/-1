@@ -1,0 +1,2 @@
+"""Modular news pipeline package."""
+

@@ -1,0 +1,134 @@
+﻿{
+  "name": "ITHome to Feishu Bitable FINAL",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://www.ithome.com/rss/"
+      },
+      "id": "2",
+      "name": "Read ITHome RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const top = items.slice(0, 10);\nconst records = top.map((it) => {\n  const j = it.json || {};\n  return {\n    fields: {\n      title: j.title || '',\n      url: j.link || '',\n      score: 0,\n      author: j.creator || j.author || '',\n      published_at: j.isoDate || j.pubDate || '',\n      hn_comments: '',\n      source: 'ithome'\n    }\n  };\n});\n\nreturn [{ json: { records } }];"
+      },
+      "id": "3",
+      "name": "Build Bitable Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"app_id\":\"cli_a9422dd3cf3adbd9\",\"app_secret\":\"vP0QH7E5G42VdbfajQ7CxN5gllT6HH1l\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4",
+      "name": "Get Tenant Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bitable/v1/apps/TtMKbePMmaxnjusXiOYcVy2LnGe/tables/tbltmme0dya8RywT/records/batch_create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Get Tenant Access Token\"].json[\"tenant_access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $node[\"Build Bitable Records\"].json.records } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5",
+      "name": "Batch Create to Bitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read ITHome RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read ITHome RSS": {
+      "main": [
+        [
+          {
+            "node": "Build Bitable Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bitable Records": {
+      "main": [
+        [
+          {
+            "node": "Get Tenant Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Access Token": {
+      "main": [
+        [
+          {
+            "node": "Batch Create to Bitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}

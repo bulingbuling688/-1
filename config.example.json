@@ -1,0 +1,47 @@
+{
+  "webhook_url": "https://YOUR_N8N_HOST/webhook/ingest-news",
+  "state_db": "collector_state.sqlite3",
+  "fetch_timeout_sec": 15,
+  "content_fetch": {
+    "enabled": true,
+    "timeout_sec": 12,
+    "max_chars": 6000,
+    "user_agent": "Mozilla/5.0 (NewsCollector)"
+  },
+  "delivery": {
+    "batch_size": 5,
+    "max_attempts": 8,
+    "max_retries": 5,
+    "retry_backoff_sec": 2,
+    "timeout_sec": 120
+  },
+  "sources": [
+    {
+      "type": "hn_topstories",
+      "enabled": true,
+      "name": "hackernews",
+      "limit": 20,
+      "topstories_url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+      "item_url_template": "https://hacker-news.firebaseio.com/v0/item/{id}.json"
+    },
+    {
+      "type": "rss",
+      "enabled": false,
+      "name": "bbc_world",
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "limit": 20
+    },
+    {
+      "type": "raingou",
+      "enabled": false,
+      "name": "raingou",
+      "base_url": "https://news.raingou.com/api/s",
+      "source_ids": [
+        "github-trending-today",
+        "hackernews",
+        "wallstreetcn-news",
+        "36kr"
+      ]
+    }
+  ]
+}

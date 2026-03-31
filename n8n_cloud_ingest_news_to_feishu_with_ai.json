@@ -1,0 +1,184 @@
+﻿{
+  "name": "Cloud Ingest -> AI Analyze -> Feishu Bitable",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-news",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 320],
+      "webhookId": "ingest-news"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ikuncode.cc/v1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer sk-RAdBhNG0CIt86KPAAjbuCLfZWndax7rkZDCLnDbaYRgLrFEn"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'gpt-5', temperature: 0.2, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are a structured news assistant. Output strict JSON format: {\"items\":[{\"source_id\":\"\",\"summary_cn\":\"\",\"tags\":\"tag1,tag2\",\"stance\":\"支持/反对/中立\"}]}' }, { role: 'user', content: JSON.stringify({ items: (($node[\"Webhook Ingest\"].json.body?.items || $node[\"Webhook Ingest\"].json.items || []).slice(0, 120).map(i => ({ source_id: i.source_id, title: i.title, url: i.url, content: i.content_full || i.content_snippet || '' }))) }) } ] } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "2",
+      "name": "LLM Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $node['Webhook Ingest'].json.body?.items || $node['Webhook Ingest'].json.items || [];\nconst aiRaw = $node['LLM Analyze'].json.choices?.[0]?.message?.content || '{}';\nlet ai = { items: [] };\ntry { ai = JSON.parse(aiRaw); } catch {}\nconst aiMap = new Map((ai.items || []).map(x => [String(x.source_id || ''), x]));\n\nconst records = original.slice(0, 200).map((x) => {\n  const sid = String(x.source_id || '');\n  const isHn = sid.startsWith('hn:');\n  const hnId = isHn ? sid.replace('hn:', '') : '';\n  const m = aiMap.get(sid) || {};\n  return {\n    fields: {\n      title: String(x.title || ''),\n      url: String(x.url || ''),\n      score: Number(x.score || 0),\n      author: String(x.author || ''),\n      published_at: String(x.published_at || ''),\n      hn_comments: isHn ? `https://news.ycombinator.com/item?id=${hnId}` : '',\n      source: String(x.source_name || x.source || ''),\n      summary_cn: String(m.summary_cn || ''),\n      tags: String(m.tags || ''),\n      stance: String(m.stance || '')\n    }\n  };\n});\n\nreturn [{ json: { records, count: records.length } }];"
+      },
+      "id": "3",
+      "name": "Build Bitable Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"app_id\":\"cli_a9422dd3cf3adbd9\",\"app_secret\":\"vP0QH7E5G42VdbfajQ7CxN5gllT6HH1l\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4",
+      "name": "Get Tenant Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bitable/v1/apps/TtMKbePMmaxnjusXiOYcVy2LnGe/tables/tbltmme0dya8RywT/records/batch_create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Get Tenant Access Token\"].json[\"tenant_access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $node['Build Bitable Records'].json.records } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5",
+      "name": "Batch Create to Bitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, inserted: $node['Build Bitable Records'].json.count, ts: new Date().toISOString() } }}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1420, 320]
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "LLM Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Analyze": {
+      "main": [
+        [
+          {
+            "node": "Build Bitable Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bitable Records": {
+      "main": [
+        [
+          {
+            "node": "Get Tenant Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Access Token": {
+      "main": [
+        [
+          {
+            "node": "Batch Create to Bitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Create to Bitable": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}

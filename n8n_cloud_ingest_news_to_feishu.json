@@ -1,0 +1,158 @@
+{
+  "name": "Cloud Webhook Ingest -> Feishu Bitable",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-news",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "ingest-news"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\nconst arr = Array.isArray(body?.items) ? body.items : [];\nconst records = arr.slice(0, 200).map((x) => {\n  const sid = String(x.source_id || '');\n  const isHn = sid.startsWith('hn:');\n  const hnId = isHn ? sid.replace('hn:', '') : '';\n  const hnComments = isHn ? `https://news.ycombinator.com/item?id=${hnId}` : '';\n  return {\n    fields: {\n      title: String(x.title || ''),\n      url: String(x.url || ''),\n      score: Number(x.score || 0),\n      author: String(x.author || ''),\n      published_at: String(x.published_at || ''),\n      hn_comments: hnComments,\n      source: String(x.source_name || x.source || '')\n    }\n  };\n});\nreturn [{ json: { records, count: records.length } }];"
+      },
+      "id": "2",
+      "name": "Build Bitable Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"app_id\":\"cli_a9422dd3cf3adbd9\",\"app_secret\":\"vP0QH7E5G42VdbfajQ7CxN5gllT6HH1l\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "3",
+      "name": "Get Tenant Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bitable/v1/apps/TtMKbePMmaxnjusXiOYcVy2LnGe/tables/tbltmme0dya8RywT/records/batch_create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Get Tenant Access Token\"].json[\"tenant_access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $node[\"Build Bitable Records\"].json.records } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4",
+      "name": "Batch Create to Bitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, inserted: $node[\"Build Bitable Records\"].json.count, ts: new Date().toISOString() } }}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1180,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "Build Bitable Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bitable Records": {
+      "main": [
+        [
+          {
+            "node": "Get Tenant Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Access Token": {
+      "main": [
+        [
+          {
+            "node": "Batch Create to Bitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Create to Bitable": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}
+

@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# local runtime data
+collector_state.sqlite3
+*.sqlite3
+*.db
+
+# local config with secrets
+config.json
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

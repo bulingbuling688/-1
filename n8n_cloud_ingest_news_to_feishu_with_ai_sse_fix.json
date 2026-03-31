@@ -1,0 +1,187 @@
+{
+  "name": "Cloud Ingest -> AI(SSE Fix) -> Feishu Bitable",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ingest-news",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 320],
+      "webhookId": "ingest-news"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ikuncode.cc/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer sk-RAdBhNG0CIt86KPAAjbuCLfZWndax7rkZDCLnDbaYRgLrFEn"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'gpt-5', temperature: 0.2, messages: [ { role: 'system', content: '你是新闻结构化助手。只输出严格JSON，不要markdown，不要多余文本。格式: {\"items\":[{\"source_id\":\"\",\"summary_cn\":\"\",\"tags\":\"tag1,tag2\",\"stance\":\"支持/反对/中立\"}]}' }, { role: 'user', content: JSON.stringify({ items: (($node[\"Webhook Ingest\"].json.body?.items || $node[\"Webhook Ingest\"].json.items || []).slice(0, 80).map(i => ({ source_id: i.source_id, title: i.title, url: i.url, content: i.content_full || i.content_snippet || '' }))) }) } ] } }}",
+        "responseFormat": "string",
+        "options": {
+          "fullResponse": true,
+          "timeout": 60000
+        }
+      },
+      "id": "2",
+      "name": "LLM Analyze (SSE)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $node['Webhook Ingest'].json.body?.items || $node['Webhook Ingest'].json.items || [];\n\n// For SSE-like responses, collect all delta.content text.\nconst rawBody = String($node['LLM Analyze (SSE)'].json.body || $node['LLM Analyze (SSE)'].json.data || '');\nconst chunks = rawBody.split(/\\r?\\n\\r?\\n/);\nlet merged = '';\nfor (const c of chunks) {\n  const line = c.trim();\n  if (!line.startsWith('data:')) continue;\n  const payload = line.slice(5).trim();\n  if (payload === '[DONE]') continue;\n  try {\n    const j = JSON.parse(payload);\n    const part = j?.choices?.[0]?.delta?.content || '';\n    if (part) merged += part;\n  } catch {}\n}\n\n// Fallback: if response is plain JSON (not SSE), try direct parse.\nlet ai = { items: [] };\ntry {\n  ai = JSON.parse(merged);\n} catch {\n  try {\n    const direct = JSON.parse(rawBody);\n    const content = direct?.choices?.[0]?.message?.content || '{}';\n    ai = JSON.parse(content);\n  } catch {\n    ai = { items: [] };\n  }\n}\n\nconst aiMap = new Map((ai.items || []).map(x => [String(x.source_id || ''), x]));\n\nconst records = original.slice(0, 200).map((x) => {\n  const sid = String(x.source_id || '');\n  const isHn = sid.startsWith('hn:');\n  const hnId = isHn ? sid.replace('hn:', '') : '';\n  const m = aiMap.get(sid) || {};\n  return {\n    fields: {\n      title: String(x.title || ''),\n      url: String(x.url || ''),\n      score: Number(x.score || 0),\n      author: String(x.author || ''),\n      published_at: String(x.published_at || ''),\n      hn_comments: isHn ? `https://news.ycombinator.com/item?id=${hnId}` : '',\n      source: String(x.source_name || x.source || ''),\n      summary_cn: String(m.summary_cn || ''),\n      tags: String(m.tags || ''),\n      stance: String(m.stance || '')\n    }\n  };\n});\n\nreturn [{ json: { records, count: records.length, ai_raw_preview: merged.slice(0, 300) } }];"
+      },
+      "id": "3",
+      "name": "Build Bitable Records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\"app_id\":\"cli_a9422dd3cf3adbd9\",\"app_secret\":\"vP0QH7E5G42VdbfajQ7CxN5gllT6HH1l\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4",
+      "name": "Get Tenant Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.feishu.cn/open-apis/bitable/v1/apps/TtMKbePMmaxnjusXiOYcVy2LnGe/tables/tbltmme0dya8RywT/records/batch_create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Get Tenant Access Token\"].json[\"tenant_access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { records: $node['Build Bitable Records'].json.records } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5",
+      "name": "Batch Create to Bitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, inserted: $node['Build Bitable Records'].json.count, ai_preview: $node['Build Bitable Records'].json.ai_raw_preview, ts: new Date().toISOString() } }}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1420, 320]
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "LLM Analyze (SSE)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Analyze (SSE)": {
+      "main": [
+        [
+          {
+            "node": "Build Bitable Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bitable Records": {
+      "main": [
+        [
+          {
+            "node": "Get Tenant Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Access Token": {
+      "main": [
+        [
+          {
+            "node": "Batch Create to Bitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Create to Bitable": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}
+
