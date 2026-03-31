@@ -57,8 +57,16 @@ copy config.example.json config.json
 编辑 `config.json`，重点修改：
 
 - `webhook_url`：你的 n8n Webhook 地址
+- `ai.webhook_url`：前端 AI 清洗工作流的 n8n Webhook 地址（如 `/webhook/frontend-ai-article`）
 - `sources[*].enabled`：启用/禁用对应采集源
 - `delivery`：批量发送和重试参数（按实际情况调整）
+- `github_storage`：AI 结果存储仓库配置（`enabled/repo/branch/path_prefix`）
+
+如需把 AI 结果写入 GitHub，请先设置环境变量：
+
+```bash
+setx GITHUB_TOKEN "你的GitHubToken"
+```
 
 ### 3. 运行
 
@@ -78,6 +86,22 @@ python collector.py --config config.json --deliver-only
 # 先把 failed 重新入队，再执行发送
 python collector.py --config config.json --retry-failed --deliver-only
 ```
+
+### 4. 启动前端控制台（可选）
+
+```bash
+python dashboard.py --config config.json --host 127.0.0.1 --port 8765
+```
+
+打开浏览器访问：`http://127.0.0.1:8765`
+
+### 5. 打包 Windows EXE（可选）
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\build_dashboard_exe.ps1
+```
+
+输出文件：`dist/KnowledgeEngineDashboard.exe`
 
 ## 使用示例
 

@@ -1,5 +1,18 @@
 {
   "webhook_url": "https://YOUR_N8N_HOST/webhook/ingest-news",
+  "ai": {
+    "webhook_url": "https://YOUR_N8N_HOST/webhook/frontend-ai-article",
+    "timeout_sec": 120,
+    "model": "gpt-4.1-mini"
+  },
+  "github_storage": {
+    "enabled": false,
+    "repo": "YOUR_GITHUB_NAME/YOUR_REPO",
+    "branch": "main",
+    "path_prefix": "generated_articles",
+    "token_env": "GITHUB_TOKEN",
+    "local_backup_dir": "generated_articles"
+  },
   "state_db": "collector_state.sqlite3",
   "fetch_timeout_sec": 15,
   "content_fetch": {

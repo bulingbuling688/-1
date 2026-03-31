@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>知识引擎控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <main class="layout">
+      <section class="hero card">
+        <h1>知识引擎控制台</h1>
+        <p>查看采集状态、触发流程，并把内容提交给 AI 清洗成中文文章。</p>
+      </section>
+
+      <section class="stats card">
+        <h2>状态概览</h2>
+        <div class="kpis">
+          <div class="kpi">
+            <span>已发送</span>
+            <strong id="sentCount">-</strong>
+          </div>
+          <div class="kpi">
+            <span>待发送</span>
+            <strong id="pendingCount">-</strong>
+          </div>
+          <div class="kpi">
+            <span>失败</span>
+            <strong id="failedCount">-</strong>
+          </div>
+          <div class="kpi">
+            <span>去重总数</span>
+            <strong id="seenCount">-</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls card">
+        <h2>运行控制</h2>
+        <div class="buttons">
+          <button data-mode="full">全流程</button>
+          <button data-mode="collect">仅采集</button>
+          <button data-mode="deliver">仅投递</button>
+          <button data-mode="retry_deliver">失败重试并投递</button>
+        </div>
+        <p id="runStatus" class="run-status">未运行</p>
+      </section>
+
+      <section class="ai card">
+        <h2>AI 清洗为中文文章</h2>
+        <form id="aiForm" class="ai-form">
+          <div class="grid-two">
+            <input id="aiTitle" type="text" placeholder="标题（可选）" />
+            <input id="aiSource" type="text" placeholder="来源（如 openai_news）" />
+          </div>
+          <input id="aiUrl" type="text" placeholder="原文链接（可选）" />
+          <textarea id="aiPrompt" rows="3" placeholder="提示词（可选）">请将输入内容清洗并改写为自然、连贯、可读的中文文章，保留事实，不添加无依据内容。</textarea>
+          <textarea id="aiContent" rows="8" placeholder="把原始内容粘贴到这里"></textarea>
+          <div class="grid-two">
+            <input id="aiAudience" type="text" placeholder="受众（默认：普通读者）" value="普通读者" />
+            <input id="aiTone" type="text" placeholder="语气（默认：专业、简洁、自然）" value="专业、简洁、自然" />
+          </div>
+          <div class="buttons">
+            <button id="aiSubmitBtn" type="submit">提交给 AI 并存储</button>
+          </div>
+        </form>
+        <p id="aiStatus" class="run-status">等待提交</p>
+        <div id="aiResult" class="ai-result"></div>
+      </section>
+
+      <section class="list card">
+        <div class="list-head">
+          <h2>最近记录</h2>
+          <div class="filters">
+            <select id="statusFilter">
+              <option value="sent">sent</option>
+              <option value="pending">pending</option>
+              <option value="failed">failed</option>
+            </select>
+            <button id="refreshBtn">刷新</button>
+          </div>
+        </div>
+        <ul id="items"></ul>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

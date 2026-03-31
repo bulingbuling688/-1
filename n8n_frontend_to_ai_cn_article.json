@@ -1,0 +1,149 @@
+{
+  "name": "Frontend -> AI Clean -> Chinese Article",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "frontend-ai-article",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook In",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        320
+      ],
+      "webhookId": "frontend-ai-article"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $node['Webhook In'].json.body || $node['Webhook In'].json || {};\n\nconst input = {\n  title: String(body.title || ''),\n  source: String(body.source || ''),\n  url: String(body.url || ''),\n  content: String(body.content || body.text || ''),\n  prompt: String(body.prompt || '请将输入内容清洗并改写为一篇自然、连贯、可读的中文文章。避免营销口吻，不添加无依据信息。'),\n  audience: String(body.audience || '普通读者'),\n  tone: String(body.tone || '专业、简洁、自然'),\n  model: String(body.model || 'gpt-4.1-mini')\n};\n\nif (!input.content) {\n  throw new Error('content 不能为空');\n}\n\nreturn [{ json: input }];"
+      },
+      "id": "2",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: $node['Normalize Input'].json.model, temperature: 0.2, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: '你是中文内容编辑助手。你的任务是把输入素材清洗并改写成高质量中文文章。必须只输出 JSON，不要 Markdown，不要额外解释。输出格式：{\"title_cn\":\"\",\"summary_cn\":\"\",\"article_cn\":\"\",\"keywords\":[\"\"],\"quality_check\":{\"facts_only_from_input\":true,\"removed_noise\":true,\"language\":\"zh-CN\"}}' }, { role: 'user', content: JSON.stringify({ instruction: $node['Normalize Input'].json.prompt, audience: $node['Normalize Input'].json.audience, tone: $node['Normalize Input'].json.tone, input: { title: $node['Normalize Input'].json.title, source: $node['Normalize Input'].json.source, url: $node['Normalize Input'].json.url, content: $node['Normalize Input'].json.content } }) } ] } }}"
+      },
+      "id": "3",
+      "name": "OpenAI Clean Writer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $node['OpenAI Clean Writer'].json.choices?.[0]?.message?.content || '{}';\nlet article;\ntry {\n  article = JSON.parse(raw);\n} catch {\n  article = {\n    title_cn: $node['Normalize Input'].json.title || '未命名文章',\n    summary_cn: '',\n    article_cn: String(raw || ''),\n    keywords: [],\n    quality_check: {\n      facts_only_from_input: false,\n      removed_noise: false,\n      language: 'zh-CN'\n    }\n  };\n}\n\nreturn [{\n  json: {\n    ok: true,\n    input_meta: {\n      source: $node['Normalize Input'].json.source,\n      url: $node['Normalize Input'].json.url,\n      model: $node['Normalize Input'].json.model\n    },\n    article\n  }\n}];"
+      },
+      "id": "4",
+      "name": "Build Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $node['Build Output'].json }}",
+        "options": {}
+      },
+      "id": "5",
+      "name": "Respond JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1280,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook In": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Clean Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Clean Writer": {
+      "main": [
+        [
+          {
+            "node": "Build Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Output": {
+      "main": [
+        [
+          {
+            "node": "Respond JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}
